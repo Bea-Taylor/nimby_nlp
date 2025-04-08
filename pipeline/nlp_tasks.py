@@ -60,6 +60,7 @@ class NLP_Tasks:
         # tokenizer=self.tokenizer 
         # )
 
+    ## Functions to pre-process the data ahead of fine-tuning the model to have domain specific knowledge. 
 
     def tokenizing_function(self, examples):
         result = self.tokenizer(examples["comment_text"])
@@ -68,22 +69,6 @@ class NLP_Tasks:
         return result
     
 
-    # def grouping_chunking_function(self, examples):
-    #     chunk_size = 128
-    #     # Concatenate all the comment texts 
-    #     concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-    #     # Compute length of concatenated texts 
-    #     total_length = len(concatenated_examples[list(examples.keys())[0]])
-    #     # We drop the last chunk if it's smaller than chunk_size
-    #     total_length = (total_length // chunk_size) * chunk_size
-    #     # Split by chunks of max_len 
-    #     result = {
-    #         k: [t[i : i + chunk_size] for i in range(0, total_length, chunk_size)]
-    #         for k, t in concatenated_examples.items()
-    #     }
-    #     result["labels"] = result["input_ids"].copy()
-    #     return result
-    
 
     def grouping_chunking_function(self, examples):
         chunk_size = 128
@@ -113,6 +98,7 @@ class NLP_Tasks:
         return result
     
 
+
     def process_data(self, data, test_size=0.2):
         tokenized_data = data.map(self.tokenizing_function, batched=True, remove_columns=["address", "stance", "date", "comment_text"])
         chunked_data = tokenized_data.map(self.grouping_chunking_function, batched=True)
@@ -120,22 +106,22 @@ class NLP_Tasks:
         return split_data
     
 
-    # def ner_locations_function(self, text):
-    #     ner_results = self.ner_pipeline(text)
 
-    #     # Sort entities by their start index in descending order to avoid index shifting
-    #     ner_results = sorted(ner_results, key=lambda x: x["start"], reverse=True)
-            
-    #     # Remove locations by replacing them with an empty string
-    #     for entity in ner_results:
-    #         text = text[:entity["start"]] + text[entity["end"]:]  # Slice out the location
-
-    #     # Remove extra spaces caused by deletion
-    #     text = re.sub(r'\s+', ' ', text).strip()
-
-    #     return text
+    ## Functions to pre-process the data ahead of topic modelling 
 
     def remove_place_names(self, df, column='text', batch_size=64):
+        """Remove place names from the text column of a DataFrame using a NER pipeline.
+
+        Args:
+            df (dataframe): The DataFrame containing the text data.
+            column (str, optional): Name of column with text. Defaults to 'text'.
+            batch_size (int, optional): Size of batch. Defaults to 64.
+
+        Returns:
+            dataframe: The DataFrame with a new column containing the cleaned text.
+        """
+
+
         df = df.copy()
         texts = df[column].fillna('').astype(str).tolist()
         cleaned_texts = []
@@ -162,6 +148,17 @@ class NLP_Tasks:
 
 
     def remove_numbers(self, df, column='cleaned_text'):
+        """Remove numbers from the specified column in the DataFrame.
+
+        Args:
+            df (dataframe): The DataFrame containing the text data.
+            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+
+        Returns:
+            dataframe: The DataFrame with the specified column cleaned of numbers.
+        """
+
+
         df = df.copy()
 
         # Ensure column is string
@@ -175,6 +172,17 @@ class NLP_Tasks:
 
 
     def remove_non_ascii(self, df, column='cleaned_text'):
+        """Remove non-ASCII characters from the specified column in the DataFrame.
+
+        Args:
+            df (dataframe): The DataFrame containing the text data.
+            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+
+        Returns:
+            dataframe: The DataFrame with the specified column cleaned of non-ASCII characters.
+        """
+
+
         # Remove non-ASCII characters directly in the specified column
         df = df.copy()
 
@@ -188,6 +196,21 @@ class NLP_Tasks:
 
 
     def split_text_on_newline(self, df, column='cleaned_text', filter_empty=True, filter_short=True, min_length=5):
+        """Split the text in the specified column of a DataFrame on newline characters.
+        This function also filters out empty strings and short strings based on the provided criteria.
+
+        Args:
+            df (dataframe): The DataFrame containing the text data.
+            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+            filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
+            filter_short (bool, optional): Indicates whether to remove strings shorter thhan min_length. Defaults to True.
+            min_length (int, optional): Minimum length of string to keep. Defaults to 5.
+
+        Returns:
+            dataframe: The DataFrame with the specified column split into multiple rows based on newline characters. Each row will contain a single chunk of text.
+        """
+
+
         # Split the text column on '\n' and explode it into new rows
         df = df.copy()
         df[column] = df[column].fillna('').astype(str)  # Ensure it's all strings
@@ -214,78 +237,4 @@ class NLP_Tasks:
 
 
 
-    # def filter_out_short_texts(self, df, column='cleaned_text', min_length=5):
-    #     df = df.copy()
 
-    #     # Ensure column is string and fill NaNs
-    #     df[column] = df[column].fillna('').astype(str)
-
-    #     return df[df[column].str.len() >= min_length].reset_index(drop=True)
-
-
-
-    # def remove_ner_locations(self, text):
-    #     """Removes locations from a single string using NER."""
-    #     if not text:  # Handle empty strings
-    #         return text
-
-    #     ner_results = self.ner_pipeline(text)
-
-    #     # Sort entities in reverse order (to prevent index shifting)
-    #     ner_results = sorted(ner_results, key=lambda x: x["start"], reverse=True)
-
-    #     # Remove detected location entities
-    #     for entity in ner_results:
-    #         text = text[:entity["start"]] + text[entity["end"]:]
-
-    #     # Clean up extra spaces
-    #     return re.sub(r'\s+', ' ', text).strip()
-    
-
-    # def remove_numbers(self, text):
-    #     text = [re.sub(r'\d+', '', single_text) for single_text in text]
-    #     # remove extra spaces
-    #     text = [re.sub(r'\s+', ' ', single_text).strip() for single_text in text]
-
-    #     return text
-
-
-    # def clean_and_remove_locations(self, examples):
-    #     """Processes a batch of text, splitting and applying NER removal."""
-    #     text_list = examples["comment_text"]  # List of text strings
-
-    #     processed_texts = []
-    #     for text in text_list:
-    #         if not isinstance(text, str):  # Ensure it's a string
-    #             continue
-
-    #         # Split into separate sentences if there are newlines
-    #         sentences = text.split("\n")
-    #         sentences = [s.strip() for s in sentences if s.strip()]  # Remove empty strings
-
-    #         # Apply NER cleaning to each sentence
-    #         cleaned_sentences = [self.ner_locations_function(sentence) for sentence in sentences]
-
-    #         # Store each sentence as a new row
-    #         processed_texts.extend(cleaned_sentences)
-
-    #     return {"comment_text": processed_texts} 
-    
-    
-    
-    # def ner_process_dataset(self, dataset):
-    #     """Applies the cleaning function using map."""
-    #     return dataset.map(self.clean_and_remove_locations, batched=True)
-    
-
-    # def clean_and_remove_locations(self, text):
-    #     text = [sentence.split('\n') for sentence in text]
-    #     text = [item for sublist in text for item in sublist]
-    #     text = [sentence.replace('\n', '') for sentence in text]
-
-    #     # remove empty strings from the list
-    #     text = list(filter(None, text))
-
-    #     cleaned_text = [self.ner_locations_function(short_text) for short_text in text]
-
-    #     return cleaned_text
