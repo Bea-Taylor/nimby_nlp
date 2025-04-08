@@ -1,0 +1,23 @@
+### Data ###
+outputs/
+/outputs
+/data
+*.csv
+*.json
+*.txt
+
+### macOS ###
+# General
+.DS_Store
+
+
+### Docker ###
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+docker-compose.debug.yml
+docker-compose.prod.yml
+*.dockerfile
+*.dockerignore
+docker
+/docker

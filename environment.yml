@@ -1,0 +1,13 @@
+name: nlp_env_analysis
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pandas
+  - selenium
+  - ipykernel
+  - psycopg2
+  - transformers
+  - gensim
+  - nltk
+prefix: /opt/miniconda3/envs/nlp_env_analysis
