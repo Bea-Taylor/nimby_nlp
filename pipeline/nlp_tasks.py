@@ -62,7 +62,7 @@ class NLP_Tasks:
 
     ## Functions to pre-process the data ahead of fine-tuning the model to have domain specific knowledge. 
 
-    def tokenizing_function(self, examples):
+    def tokenize_func(self, examples):
         result = self.tokenizer(examples["comment_text"])
         if self.tokenizer.is_fast:
             result["word_ids"] = [result.word_ids(i) for i in range(len(result["input_ids"]))]
@@ -70,8 +70,7 @@ class NLP_Tasks:
     
 
 
-    def grouping_chunking_function(self, examples):
-        chunk_size = 128
+    def group_chunk_func(self, examples, chunk_size=128):
         
         # Ensure concatenation works regardless of whether input is a list of lists or a flat list
         concatenated_examples = {k: [] for k in examples.keys()}
@@ -203,7 +202,7 @@ class NLP_Tasks:
             df (dataframe): The DataFrame containing the text data.
             column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
             filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
-            filter_short (bool, optional): Indicates whether to remove strings shorter thhan min_length. Defaults to True.
+            filter_short (bool, optional): Indicates whether to remove strings shorter than min_length. Defaults to True.
             min_length (int, optional): Minimum length of string to keep. Defaults to 5.
 
         Returns:
@@ -234,7 +233,72 @@ class NLP_Tasks:
         df.reset_index(drop=True, inplace=True)
 
         return df
+    
 
+
+    def chunk_with_overlap(self, text, max_length=512, overlap=20):
+        """Chunk the text into smaller segments with a specified overlap.
+
+        Args:
+            text (str): The text to be chunked.
+            max_length (int, optional): The max token length of the chunk. Defaults to 512.
+            overlap (int, optional): The overlap of tokens between chunks. Defaults to 20.
+
+        Returns:
+            list: List of strings, each representing a chunk of the original text.
+        """
+
+
+        tokens = self.tokenizer.tokenize(text)
+
+        chunks = []
+        for i in range(0, len(tokens), max_length - overlap):
+            chunk = tokens[i:i + max_length]
+            chunks.append(self.tokenizer.convert_tokens_to_string(chunk))
+        return chunks
+    
+
+
+    def split_text_by_length(self, df, column='cleaned_text', max_length=512, overlap=20, filter_empty=True, filter_short=True, min_length=5):
+        """Split the text in the specified column of a DataFrame into smaller chunks of a specified maximum length.
+        This function also filters out empty strings and short strings based on the provided criteria.
+
+        Args:
+            df (dataframe): The DataFrame containing the text data.
+            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+            max_length (int, optional): The max token length of the chunk. Defaults to 512.
+            overlap (int, optional): The overlap of tokens between chunks. Defaults to 20.
+            filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
+            filter_short (bool, optional): Indicates whether to remove strings shorter than min_length. Defaults to True.
+            min_length (int, optional): Minimum length of string to keep. Defaults to 5.
+
+        Returns:
+            dataframe: The DataFrame with the specified column split into multiple rows based on the specified chunking criteria. Each row will contain a single chunk of text.
+        """
+
+
+        df = df.copy()
+        df[column] = df[column].fillna('').astype(str)
+        df[column] = df[column].apply(lambda x: NLP_Tasks.chunk_with_overlap(x, max_length, overlap))
+
+        # Explode the DataFrame to have one row per chunk
+        df = df.explode(column, ignore_index=True)
+
+        # Strip whitespace from the resulting chunks
+        df[column] = df[column].str.strip()
+
+        # If filter_empty is True, drop any rows where the split chunk is empty
+        if filter_empty:
+            df = df[df[column] != '']
+
+        # If filter_short is True, drop any rows where the split chunk is shorter than min_length
+        if filter_short:
+            df = df[df[column].str.len() >= min_length]
+
+        # Reset index after exploding
+        df.reset_index(drop=True, inplace=True)
+
+        return df
 
 
 
