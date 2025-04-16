@@ -235,6 +235,68 @@ class NLP_Tasks:
         return df
     
 
+    def split_text_on_period(self, df, column='cleaned_text', filter_empty=True, filter_short=True, min_length=5):
+        """Split the text in the specified column of a DataFrame on full stop characters.
+        This function also filters out empty strings and short strings based on the provided criteria.
+
+        Args:
+            df (dataframe): The DataFrame containing the text data.
+            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+            filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
+            filter_short (bool, optional): Indicates whether to remove strings shorter than min_length. Defaults to True.
+            min_length (int, optional): Minimum length of string to keep. Defaults to 5.
+
+        Returns:
+            dataframe: The DataFrame with the specified column split into multiple rows based on newline characters. Each row will contain a single chunk of text.
+        """
+
+
+        # Split the text column on '\n' and explode it into new rows
+        df = df.copy()
+        df[column] = df[column].fillna('').astype(str)  # Ensure it's all strings
+        df[column] = df[column].str.split('.')
+
+        # Explode the DataFrame
+        df = df.explode(column, ignore_index=True)
+
+        # Strip whitespace from resulting chunks
+        df[column] = df[column].str.strip()
+
+        # If filter_empty is True, drop any rows where the split chunk is empty
+        if filter_empty:
+            df = df[df[column] != '']
+
+        # If filter_short is True, drop any rows where the split chunk is shorter than min_length
+        if filter_short:
+            df = df[df[column].str.len() >= min_length]
+
+        # Reset index after exploding
+        df.reset_index(drop=True, inplace=True)
+
+        return df
+    
+
+    def remove_empty_rows(self, df, column='cleaned_text'):
+        """Remove empty rows from the specified column in the DataFrame.
+
+        Args:
+            df (dataframe): The DataFrame containing the text data.
+            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+
+        Returns:
+            dataframe: The DataFrame with the specified column cleaned of empty rows.
+        """
+
+        df = df.copy()
+        df[column] = df[column].fillna('').astype(str)
+        df = df[df[column] != '']
+        df = df[df['cleaned_comment_text'].str.strip() != 'Not Available']
+        # remove rows with empty strings
+        df = df[df['cleaned_comment_text'].str.strip() != 'not available']
+
+        return df
+
+
 
     def chunk_with_overlap(self, text, max_length=512, overlap=20):
         """Chunk the text into smaller segments with a specified overlap.
