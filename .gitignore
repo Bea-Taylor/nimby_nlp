@@ -5,6 +5,7 @@ outputs/
 *.csv
 *.json
 *.txt
+*.pkl
 
 ### macOS ###
 # General
