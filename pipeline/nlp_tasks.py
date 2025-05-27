@@ -10,7 +10,7 @@ import string
 
 
 class NLP_Tasks:
-    def __init__(self, model_path):
+    def __init__(self, model_path="../outputs/nlp_fine_tuning/distilbert-base-uncased"):
         self.model_checkpoint = model_path
         self.model = AutoModelForMaskedLM.from_pretrained(self.model_checkpoint)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_checkpoint)
