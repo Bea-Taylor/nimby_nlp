@@ -393,5 +393,112 @@ class CommentsSaver:
         except Exception as e:
             print(f"Error removing duplicate comments: {e}")
             return 0  # Return 0 if there was an error
+        
+
+
+    def count_duplicate_comments_by_council(self):
+        """Returns a dictionary with the number of duplicated comments grouped by council."""
+        
+        query = """
+        SELECT council, COUNT(*) AS duplicate_count
+        FROM (
+            SELECT 
+                council,
+                ROW_NUMBER() OVER (
+                    PARTITION BY council, application_id, address, stance, date, comment_text 
+                    ORDER BY comment_id ASC
+                ) AS row_num
+            FROM comments
+        ) AS numbered
+        WHERE row_num > 1
+        GROUP BY council
+        ORDER BY duplicate_count DESC;
+        """
+
+        try:
+            if self.connection and self.cursor:
+                with self.connection.cursor() as cursor:
+                    cursor.execute(query)
+                    results = cursor.fetchall()
+                    # Convert to dictionary or any desired format
+                    duplicates_by_council = {row[0]: row[1] for row in results}
+                    return duplicates_by_council
+            else:
+                print("Database connection not established.")
+                return {}
+        except Exception as e:
+            print(f"Error counting duplicate comments: {e}")
+            return {}
+    
+
+    
+    def update_cleaned_comment_text(self, comment_id, cleaned_comment_text):
+        """
+        Updates the remote database with the cleaned comment text for a single comment_id.
+        """
+        # SAFETY: check that column exists only once, cached for future
+        if not hasattr(self, "_column_checked"):
+            with self.connection.cursor() as cursor:
+                cursor.execute("SELECT * FROM comments LIMIT 1;")
+                colnames = [desc[0] for desc in cursor.description]
+                if 'cleaned_comment_text' not in colnames:
+                    raise Exception("Column 'cleaned_comment_text' does not exist in the 'comments' table.")
+            self._column_checked = True
+
+        update_sql = """
+        UPDATE comments
+        SET cleaned_comment_text = %s
+        WHERE comment_id = %s;
+        """
+
+        retry_attempts = 3
+
+        for attempt in range(1, retry_attempts + 1):
+            try:
+                with self.connection.cursor() as cursor:
+                    cursor.execute(update_sql, (cleaned_comment_text, comment_id))
+                self.connection.commit()
+                break
+            except Exception as e:
+                print(f"[Attempt {attempt}] Error updating comment_id {comment_id}: {e}")
+                if attempt == retry_attempts:
+                    print(f"[Failed] Could not update comment_id {comment_id} after {retry_attempts} attempts.")
+                else:
+                    time.sleep(1)
+
+
+    def add_new_column(self, table_name, column_name, column_type= "TEXT"):
+        """
+        Adds a new column to the specified table in the remote database if it doesn't already exist.
+
+        Args:
+            table_name (str): Name of the table to modify.
+            column_name (str): Name of the new column to add.
+            column_type (str, optional): SQL data type of the new column (default is "TEXT").
+        """
+
+        table_name = self.table_name if table_name is None else table_name
+        
+        try:
+            with self.connection.cursor() as cursor:
+                # Check if the column already exists
+                cursor.execute("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = %s AND column_name = %s;
+                """, (table_name, column_name))
+                column_exists = cursor.fetchone() is not None
+
+                if not column_exists:
+                    print(f"Adding column '{column_name}' to table '{table_name}'...")
+                    alter_query = f"""ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type};"""
+                    cursor.execute(alter_query)
+                    self.connection.commit()
+                    print(f"Column '{column_name}' added successfully.")
+                else:
+                    print(f"Column '{column_name}' already exists in table '{table_name}'.")
+        except Exception as e:
+            print(f"Error adding column '{column_name}' to table '{table_name}': {e}")
+            raise
 
 

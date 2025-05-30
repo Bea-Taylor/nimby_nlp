@@ -10,16 +10,20 @@ import string
 
 
 class NLP_Tasks:
-    def __init__(self, model_path="../outputs/nlp_fine_tuning/distilbert-base-uncased"):
-        self.model_checkpoint = model_path
-        self.model = AutoModelForMaskedLM.from_pretrained(self.model_checkpoint)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_checkpoint)
+    def __init__(self):
 
-        self.ner_pipeline = pipeline(
+        self.place_ner_pipeline = pipeline(
             task="ner",
             model="cjber/reddit-ner-place_names",
             tokenizer="cjber/reddit-ner-place_names",
             aggregation_strategy="first",
+        )
+
+        self.people_ner_pipeline = pipeline(
+            task="ner",
+            model="dslim/bert-base-NER",
+            tokenizer="dslim/bert-base-NER",
+            aggregation_strategy="first"
         )
 
         # self.model_checkpoint = model_path
@@ -61,6 +65,7 @@ class NLP_Tasks:
         # )
 
     ## Functions to pre-process the data ahead of fine-tuning the model to have domain specific knowledge. 
+
 
     def tokenize_func(self, examples):
         result = self.tokenizer(examples["comment_text"])
@@ -108,12 +113,13 @@ class NLP_Tasks:
 
     ## Functions to pre-process the data ahead of topic modelling 
 
-    def remove_place_names(self, df, column='text', batch_size=64):
+    def remove_place_names(self, df, column='text', new_column_name='cleaned_text', batch_size=64):
         """Remove place names from the text column of a DataFrame using a NER pipeline.
 
         Args:
             df (dataframe): The DataFrame containing the text data.
             column (str, optional): Name of column with text. Defaults to 'text'.
+            new_column_name (str, optional): Name of the new column to store cleaned text. Defaults to 'cleaned_text'.
             batch_size (int, optional): Size of batch. Defaults to 64.
 
         Returns:
@@ -127,7 +133,7 @@ class NLP_Tasks:
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i+batch_size]
-            batch_results = self.ner_pipeline(batch)
+            batch_results = self.place_ner_pipeline(batch)
 
             for text, entities in zip(batch, batch_results):
                 # Remove location entities (optional: filter for 'LOC' only if needed)
@@ -141,17 +147,60 @@ class NLP_Tasks:
                 cleaned_texts.append(text)
 
         # Add to DataFrame as a new column
-        df[f'cleaned_{column}'] = cleaned_texts
+        df[new_column_name] = cleaned_texts
+        return df
+
+
+
+    def remove_person_names(self, df, column='text', new_column_name='cleaned_text', batch_size=64, replace=False):
+        """Remove or replace person names in the text column of a DataFrame using a NER pipeline.
+
+        Args:
+            df (dataframe): The DataFrame containing the text data.
+            column (str, optional): Name of column with text. Defaults to 'text'.
+            new_column_name (str, optional): Name of the new column to store cleaned text. Defaults to 'cleaned_text'.
+            batch_size (int, optional): Size of batch. Defaults to 64.
+            replace (bool, optional): If True, replaces names with '[NAME]'; if False, removes them.
+
+        Returns:
+            dataframe: The DataFrame with a new column containing the cleaned text.
+        """
+        df = df.copy()
+        texts = df[column].fillna('').astype(str).tolist()
+        cleaned_texts = []
+
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i+batch_size]
+            batch_results = self.people_ner_pipeline(batch)
+
+            for text, entities in zip(batch, batch_results):
+                # Filter for person entities only
+                person_entities = [e for e in entities if e['entity_group'] == 'PER']
+                sorted_entities = sorted(person_entities, key=lambda x: x["start"], reverse=True)
+
+                for entity in sorted_entities:
+                    if replace:
+                        text = text[:entity["start"]] + '[NAME]' + text[entity["end"]:]
+                    else:
+                        text = text[:entity["start"]] + text[entity["end"]:]
+
+                # Preserve newlines, just collapse tabs/spaces
+                text = re.sub(r'[ \t]+', ' ', text).strip()
+                cleaned_texts.append(text)
+
+        # Add to DataFrame as a new column
+        df[new_column_name] = cleaned_texts
         return df
     
 
 
-    def remove_numbers(self, df, column='cleaned_text'):
+    def remove_numbers(self, df, column='text', new_column_name='cleaned_text',):
         """Remove numbers from the specified column in the DataFrame.
 
         Args:
             df (dataframe): The DataFrame containing the text data.
             column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+            new_column_name (str, optional): Name of the new column to store cleaned text. Defaults to 'cleaned_text'.
 
         Returns:
             dataframe: The DataFrame with the specified column cleaned of numbers.
@@ -161,21 +210,22 @@ class NLP_Tasks:
         df = df.copy()
 
         # Ensure column is string
-        df[column] = df[column].fillna('').astype(str)
+        df[new_column_name] = df[column].fillna('').astype(str)
 
         # Remove numbers and extra spaces
-        df[column] = df[column].apply(lambda x: re.sub(r'\d+', '', x).strip())
+        df[new_column_name] = df[new_column_name].apply(lambda x: re.sub(r'\d+', '', x).strip())
 
         return df
     
 
 
-    def remove_non_ascii(self, df, column='cleaned_text'):
+    def remove_non_ascii(self, df, column='text', new_column_name='cleaned_text'):
         """Remove non-ASCII characters from the specified column in the DataFrame.
 
         Args:
             df (dataframe): The DataFrame containing the text data.
-            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+            column (str, optional): Name of column with text. Defaults to 'text'.
+            new_column_name (str, optional): Name of the new column to store cleaned text. Defaults to 'cleaned_text'.
 
         Returns:
             dataframe: The DataFrame with the specified column cleaned of non-ASCII characters.
@@ -186,7 +236,7 @@ class NLP_Tasks:
         df = df.copy()
 
         # Apply the transformation to the specified column
-        df[column] = df[column].fillna('').astype(str).apply(
+        df[new_column_name] = df[column].fillna('').astype(str).apply(
             lambda text: ''.join([char for char in text if char in string.printable])
         )
 
@@ -194,13 +244,13 @@ class NLP_Tasks:
     
 
 
-    def split_text_on_newline(self, df, column='cleaned_text', filter_empty=True, filter_short=True, min_length=5):
+    def split_text_on_newline(self, df, column='text', filter_empty=True, filter_short=True, min_length=5):
         """Split the text in the specified column of a DataFrame on newline characters.
         This function also filters out empty strings and short strings based on the provided criteria.
 
         Args:
             df (dataframe): The DataFrame containing the text data.
-            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+            column (str, optional): Name of column with text. Defaults to 'text'.
             filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
             filter_short (bool, optional): Indicates whether to remove strings shorter than min_length. Defaults to True.
             min_length (int, optional): Minimum length of string to keep. Defaults to 5.
@@ -235,13 +285,13 @@ class NLP_Tasks:
         return df
     
 
-    def split_text_on_period(self, df, column='cleaned_text', filter_empty=True, filter_short=True, min_length=5):
+    def split_text_on_period(self, df, column='text', filter_empty=True, filter_short=True, min_length=5):
         """Split the text in the specified column of a DataFrame on full stop characters.
         This function also filters out empty strings and short strings based on the provided criteria.
 
         Args:
             df (dataframe): The DataFrame containing the text data.
-            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+            column (str, optional): Name of column with text. Defaults to 'text'.
             filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
             filter_short (bool, optional): Indicates whether to remove strings shorter than min_length. Defaults to True.
             min_length (int, optional): Minimum length of string to keep. Defaults to 5.
@@ -276,7 +326,7 @@ class NLP_Tasks:
         return df
     
 
-    def remove_empty_rows(self, df, column='cleaned_text'):
+    def remove_empty_rows(self, df, column='text'):
         """Remove empty rows from the specified column in the DataFrame.
 
         Args:
@@ -290,9 +340,9 @@ class NLP_Tasks:
         df = df.copy()
         df[column] = df[column].fillna('').astype(str)
         df = df[df[column] != '']
-        df = df[df['cleaned_comment_text'].str.strip() != 'Not Available']
+        df = df[df[column].str.strip() != 'Not Available']
         # remove rows with empty strings
-        df = df[df['cleaned_comment_text'].str.strip() != 'not available']
+        df = df[df[column].str.strip() != 'not available']
 
         return df
 
@@ -321,13 +371,13 @@ class NLP_Tasks:
     
 
 
-    def split_text_by_length(self, df, column='cleaned_text', max_length=512, overlap=20, filter_empty=True, filter_short=True, min_length=5):
+    def split_text_by_length(self, df, column='text', max_length=512, overlap=20, filter_empty=True, filter_short=True, min_length=5):
         """Split the text in the specified column of a DataFrame into smaller chunks of a specified maximum length.
         This function also filters out empty strings and short strings based on the provided criteria.
 
         Args:
             df (dataframe): The DataFrame containing the text data.
-            column (str, optional): Name of column with text. Defaults to 'cleaned_text'.
+            column (str, optional): Name of column with text. Defaults to 'text'.
             max_length (int, optional): The max token length of the chunk. Defaults to 512.
             overlap (int, optional): The overlap of tokens between chunks. Defaults to 20.
             filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
@@ -364,3 +414,46 @@ class NLP_Tasks:
 
 
 
+    def process_string(self, text, replace_person_names=False):
+        """
+        Process a single string by:
+        - Removing place names
+        - Removing or replacing person names
+        - Removing non-ASCII characters
+
+        Args:
+            text (str): The input text string.
+            replace_person_names (bool): If True, replaces person names with '[NAME]'; otherwise removes them.
+
+        Returns:
+            str: The cleaned text.
+        """
+        if not text:
+            return ""
+
+        # Remove non-ASCII characters early
+        text = ''.join([char for char in text if char in string.printable])
+
+        # Run NER pipelines
+        place_entities = self.place_ner_pipeline([text])[0]
+        person_entities = self.people_ner_pipeline([text])[0]
+
+        # Filter only person entities
+        person_entities = [e for e in person_entities if e.get("entity_group") == "PER"]
+
+        # Combine all entities
+        all_entities = place_entities + person_entities
+
+        # Sort in reverse order of start index to avoid offset issues during string manipulation
+        all_entities = sorted(all_entities, key=lambda x: x["start"], reverse=True)
+
+        for entity in all_entities:
+            if entity in person_entities and replace_person_names:
+                text = text[:entity["start"]] + "[NAME]" + text[entity["end"]:]
+            else:
+                text = text[:entity["start"]] + text[entity["end"]:]
+
+        # Clean up extra spaces and tabs (preserve newlines)
+        text = re.sub(r'[ \t]+', ' ', text).strip()
+
+        return text

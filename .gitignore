@@ -6,6 +6,7 @@ outputs/
 *.json
 *.txt
 *.pkl
+*.jsonl
 
 ### macOS ###
 # General
