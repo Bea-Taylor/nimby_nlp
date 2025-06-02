@@ -17,3 +17,19 @@ Coming soon!
 ### Sharing the work
 
 This tool was developed by AI4CI Smart Cities project in the [Centre for Advanced Spatial Analysis (CASA)](https://www.ucl.ac.uk/bartlett/casa).
+
+
+#### Docker
+
+If you wish to install and run via a Jupyter notebook in Docker:
+
+Build the image:
+
+```
+docker build -t "comment_crunch" .
+```
+
+Run the image:
+```
+docker run -p 8888:8888 comment_crunch
+```
