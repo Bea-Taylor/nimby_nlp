@@ -36,4 +36,4 @@ docker run -p 8888:8888 comment_crunch
 
 Then navigate in your browser to:
 
-127.0.0.1:8888
+[127.0.0.1:8888](127.0.0.1:8888)
