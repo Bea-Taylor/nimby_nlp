@@ -18,6 +18,7 @@ RUN mamba env create -f environment.yml && \
 # This layer will only rebuild if your application code changes, not the environment.
 COPY . .
 
+EXPOSE 8888
 # Set the default command to run when the container starts.
 # We explicitly activate the 'nlp_env_analysis' environment
 # before running the jupyter notebook command.
