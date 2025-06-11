@@ -244,30 +244,83 @@ class NLP_Tasks:
     
 
 
+    # def split_text_on_newline(self, df, column='text', filter_empty=True, filter_short=True, min_length=5):
+    #     """Split the text in the specified column of a DataFrame on newline characters.
+    #     This function also filters out empty strings and short strings based on the provided criteria.
+
+    #     Args:
+    #         df (dataframe): The DataFrame containing the text data.
+    #         column (str, optional): Name of column with text. Defaults to 'text'.
+    #         filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
+    #         filter_short (bool, optional): Indicates whether to remove strings shorter than min_length. Defaults to True.
+    #         min_length (int, optional): Minimum length of string to keep. Defaults to 5.
+
+    #     Returns:
+    #         dataframe: The DataFrame with the specified column split into multiple rows based on newline characters. Each row will contain a single chunk of text.
+    #     """
+
+    #     df_copy = df.copy()
+
+    #     # Store the original index as a new column before exploding
+    #     df_copy['original_comment_id'] = df_copy.index
+
+    #     # Ensure the text column is string type and handle NaNs
+    #     df_copy[column] = df_copy[column].fillna('').astype(str)
+
+    #     # Split the text column on '\n'
+    #     df_copy[column] = df_copy[column].str.split('\n')
+
+    #     # Explode the DataFrame, maintaining the original_comment_id
+    #     # We explicitly drop the original index here, as we are creating a new row for each sentence.
+    #     # The `original_comment_id` column now links back to the original comment.
+    #     df_exploded = df_copy.explode(column, ignore_index=True)
+
+    #     # Strip whitespace from resulting chunks
+    #     df_exploded[column] = df_exploded[column].str.strip()
+
+    #     # If filter_empty is True, drop any rows where the split chunk is empty
+    #     if filter_empty:
+    #         df_exploded = df_exploded[df_exploded[column] != '']
+
+    #     # If filter_short is True, drop any rows where the split chunk is shorter than min_length
+    #     if filter_short:
+    #         df_exploded = df_exploded[df_exploded[column].str.len() >= min_length]
+
+    #     # Reset index after exploding and filtering
+    #     df_exploded.reset_index(drop=True, inplace=True)
+
+    #     return df
+
+
+    
     def split_text_on_newline(self, df, column='text', filter_empty=True, filter_short=True, min_length=5):
+
         """Split the text in the specified column of a DataFrame on newline characters.
         This function also filters out empty strings and short strings based on the provided criteria.
 
         Args:
-            df (dataframe): The DataFrame containing the text data.
-            column (str, optional): Name of column with text. Defaults to 'text'.
-            filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
-            filter_short (bool, optional): Indicates whether to remove strings shorter than min_length. Defaults to True.
-            min_length (int, optional): Minimum length of string to keep. Defaults to 5.
+        df (dataframe): The DataFrame containing the text data.
+        column (str, optional): Name of column with text. Defaults to 'text'.
+        filter_empty (bool, optional): Indicates whether to remove empty strings. Defaults to True.
+        filter_short (bool, optional): Indicates whether to remove strings shorter than min_length. Defaults to True.
+        min_length (int, optional): Minimum length of string to keep. Defaults to 5.
 
         Returns:
-            dataframe: The DataFrame with the specified column split into multiple rows based on newline characters. Each row will contain a single chunk of text.
+        dataframe: The DataFrame with the specified column split into multiple rows based on newline characters. Each row will contain a single chunk of text.
+
         """
-
-
         # Split the text column on '\n' and explode it into new rows
         df = df.copy()
-        df[column] = df[column].fillna('').astype(str)  # Ensure it's all strings
+        
+        df['original_comment_id'] = df.index
+
+        df[column] = df[column].fillna('').astype(str) # Ensure it's all strings
+
         df[column] = df[column].str.split('\n')
 
         # Explode the DataFrame
-        df = df.explode(column, ignore_index=True)
 
+        df = df.explode(column, ignore_index=True)
         # Strip whitespace from resulting chunks
         df[column] = df[column].str.strip()
 
@@ -278,7 +331,6 @@ class NLP_Tasks:
         # If filter_short is True, drop any rows where the split chunk is shorter than min_length
         if filter_short:
             df = df[df[column].str.len() >= min_length]
-
         # Reset index after exploding
         df.reset_index(drop=True, inplace=True)
 
@@ -457,3 +509,80 @@ class NLP_Tasks:
         text = re.sub(r'[ \t]+', ' ', text).strip()
 
         return text
+    
+
+
+    def merge_sentences_back_to_comments(self, df, text_column = 'text', topic_column = 'topic', topic_probability_column = None, min_topic_probability = 0.02, original_id_column = 'original_comment_id'):
+        """
+        Merges sentences back into their original comments and collects the set of unique topics
+        associated with each original comment, optionally filtering by topic assignment probability.
+
+        Assumes the input DataFrame has an 'original_comment_id' column (created by the updated
+        split_text_on_newline function), a 'text_column' (containing sentences),
+        and a 'topic_column' (assigned by bertopic or similar).
+        If topic_probability_column is provided, topics will be filtered based on min_topic_probability.
+
+        Args:
+            df (pd.DataFrame): The DataFrame containing exploded sentences, original IDs, and topics.
+            text_column (str, optional): The name of the column containing the split sentences. Defaults to 'text'.
+            topic_column (str, optional): The name of the column containing the assigned topics. Defaults to 'topic'.
+            topic_probability_column (str, optional): The name of the column containing the topic assignment probabilities.
+                                                      If None, all unique topics are collected without probability filtering. Defaults to None.
+            min_topic_probability (float, optional): The minimum probability a topic assignment must have to be included.
+                                                     Only applies if topic_probability_column is provided. Defaults to 0.02.
+            original_id_column (str, optional): The name of the column linking back to the original comment ID.
+                                                 Defaults to 'original_comment_id'.
+
+        Returns:
+            pd.DataFrame: A DataFrame where each row represents an original comment,
+                          with the merged comment text and a list of its unique (and possibly filtered) topics.
+        """
+        # Group by the original comment ID
+        grouped = df.groupby(original_id_column)
+
+        def aggregate_group_data(group_df):
+            """
+            Helper function to aggregate text and topics for a single group (original comment).
+            This function is applied to each sub-DataFrame of the grouped object.
+            """
+            merged_comment_text = '. '.join(group_df[text_column].astype(str))
+
+            all_topics_for_group = set()
+
+            # Iterate through each row (representing a sentence) in the current group_df
+            for _, row in group_df.iterrows():
+                topics_for_sentence = row[topic_column]
+                
+                # Check for topic_probability_column existence and validity
+                prob_for_sentence = None
+                if topic_probability_column and topic_probability_column in group_df.columns and pd.notna(row[topic_probability_column]):
+                    prob_for_sentence = row[topic_probability_column]
+
+                # Ensure topics_for_sentence is iterable (can be a single topic or a list of topics)
+                # This handles cases where a sentence might have a single topic or multiple topics.
+                if not isinstance(topics_for_sentence, list):
+                    topics_for_sentence = [topics_for_sentence] # Convert single topic to a list for uniform processing
+
+                # Apply probability filtering if specified and probability exists
+                if topic_probability_column and prob_for_sentence is not None:
+                    if prob_for_sentence > min_topic_probability:
+                        # If probability threshold is met for the sentence, add all its topics
+                        for topic in topics_for_sentence:
+                            all_topics_for_group.add(topic)
+                else:
+                    # If no probability filtering or column not found, add all topics from this sentence
+                    for topic in topics_for_sentence:
+                        all_topics_for_group.add(topic)
+            
+            # Return a Series with the aggregated results for this group
+            return pd.Series({
+                'merged_comment': merged_comment_text,
+                'topics': sorted(list(all_topics_for_group))
+            })
+
+        # Apply the custom aggregation function to each group.
+        # This will return a DataFrame where the index is original_comment_id
+        # and columns are 'merged_comment' and 'topics'.
+        merged_comments_df = grouped.apply(aggregate_group_data).reset_index()
+
+        return merged_comments_df
