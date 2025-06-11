@@ -1,0 +1,31 @@
+name: nlp_env_analysis
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - gensim
+  - ipykernel
+  - pandas
+  - psycopg2
+  - python=3.10
+  - selenium
+  - transformers
+  - bertopic
+  - scipy
+  - accelerate
+  - nbformat
+  - matplotlib
+  - openpyxl
+  - numpy
+  - datasets
+  - scikit-learn
+  - numba
+  - sentence-transformers
+  - huggingface_hub
+  - geopy
+  - notebook
+  - tensorboard
+  - openai
+  - sentencepiece
+prefix: /opt/conda/envs/nlp_env_analysis
