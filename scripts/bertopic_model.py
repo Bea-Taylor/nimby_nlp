@@ -23,6 +23,9 @@ nlp_tasks = NLP_Tasks()
 
 df = cs.read_all()
 
+# select only the comments that are classified as 'Objects'
+df = df[df['stance']=='Objects']
+
 ### Preprocess the text data
 
 # split text on newlines, this function preserves the metadata by exploding the dataframe
