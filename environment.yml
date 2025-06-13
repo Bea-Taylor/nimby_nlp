@@ -22,7 +22,6 @@ dependencies:
   - sentence-transformers
   - huggingface_hub
   - geopy
-  - notebook
   - pip:
       - doccano
 prefix: /opt/miniconda3/envs/nlp_env_analysis
