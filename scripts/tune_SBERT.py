@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer, losses
 from torch.utils.data import DataLoader
 
 # Load training examples from a pickle file
-with open('outputs/train_examples.pkl', 'rb') as f:
+with open('outputs/train_examples_downsample.pkl', 'rb') as f:
     train_examples = pickle.load(f)
 
 # Summary stats of train_examples
