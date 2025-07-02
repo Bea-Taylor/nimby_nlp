@@ -4,9 +4,13 @@ import math
 import collections
 from transformers import AutoModelForMaskedLM, AutoTokenizer, DataCollatorForLanguageModeling, default_data_collator, TrainingArguments, Trainer, pipeline
 import torch
+from sentence_transformers import SentenceTransformer
 from datasets import Dataset
 import re
 import string 
+
+from database.topics import Topics
+
 
 
 class NLP_Tasks:
@@ -25,6 +29,12 @@ class NLP_Tasks:
             tokenizer="dslim/bert-base-NER",
             aggregation_strategy="first"
         )
+
+        self.model = SentenceTransformer("Bea-Taylor/objection_fine_tuned_4")
+        # self.tokenizer = AutoTokenizer.from_pretrained("Bea-Taylor/objection_fine_tuned_4")
+        self.tokenizer = self.model.tokenizer
+
+        self.tp = Topics(env="dev")
 
         # self.model_checkpoint = model_path
         # self.data = data
@@ -67,47 +77,47 @@ class NLP_Tasks:
     ## Functions to pre-process the data ahead of fine-tuning the model to have domain specific knowledge. 
 
 
-    def tokenize_func(self, examples):
-        result = self.tokenizer(examples["comment_text"])
-        if self.tokenizer.is_fast:
-            result["word_ids"] = [result.word_ids(i) for i in range(len(result["input_ids"]))]
-        return result
+    # def tokenize_func(self, examples):
+    #     result = self.tokenizer(examples["comment_text"])
+    #     if self.tokenizer.is_fast:
+    #         result["word_ids"] = [result.word_ids(i) for i in range(len(result["input_ids"]))]
+    #     return result
     
 
 
-    def group_chunk_func(self, examples, chunk_size=128):
+    # def group_chunk_func(self, examples, chunk_size=128):
         
-        # Ensure concatenation works regardless of whether input is a list of lists or a flat list
-        concatenated_examples = {k: [] for k in examples.keys()}
-        for k in examples.keys():
-            for item in examples[k]:  
-                if isinstance(item, list):  
-                    concatenated_examples[k].extend(item)  # Flatten properly
-                else:
-                    concatenated_examples[k].append(item)  # Directly add if already flat
+    #     # Ensure concatenation works regardless of whether input is a list of lists or a flat list
+    #     concatenated_examples = {k: [] for k in examples.keys()}
+    #     for k in examples.keys():
+    #         for item in examples[k]:  
+    #             if isinstance(item, list):  
+    #                 concatenated_examples[k].extend(item)  # Flatten properly
+    #             else:
+    #                 concatenated_examples[k].append(item)  # Directly add if already flat
 
-        # Compute total length, dropping the last chunk if it's smaller than chunk_size
-        total_length = (len(concatenated_examples[list(examples.keys())[0]]) // chunk_size) * chunk_size
+    #     # Compute total length, dropping the last chunk if it's smaller than chunk_size
+    #     total_length = (len(concatenated_examples[list(examples.keys())[0]]) // chunk_size) * chunk_size
 
-        # Chunking
-        result = {
-            k: [t[i : i + chunk_size] for i in range(0, total_length, chunk_size)]
-            for k, t in concatenated_examples.items()
-        }
+    #     # Chunking
+    #     result = {
+    #         k: [t[i : i + chunk_size] for i in range(0, total_length, chunk_size)]
+    #         for k, t in concatenated_examples.items()
+    #     }
 
-        # Copy "input_ids" as labels for model training
-        if "input_ids" in result:
-            result["labels"] = result["input_ids"].copy()
+    #     # Copy "input_ids" as labels for model training
+    #     if "input_ids" in result:
+    #         result["labels"] = result["input_ids"].copy()
 
-        return result
+    #     return result
     
 
 
-    def process_data(self, data, test_size=0.2):
-        tokenized_data = data.map(self.tokenizing_function, batched=True, remove_columns=["address", "stance", "date", "comment_text"])
-        chunked_data = tokenized_data.map(self.grouping_chunking_function, batched=True)
-        split_data = chunked_data.train_test_split(test_size=test_size)
-        return split_data
+    # def process_data(self, data, test_size=0.2):
+    #     tokenized_data = data.map(self.tokenizing_function, batched=True, remove_columns=["address", "stance", "date", "comment_text"])
+    #     chunked_data = tokenized_data.map(self.grouping_chunking_function, batched=True)
+    #     split_data = chunked_data.train_test_split(test_size=test_size)
+    #     return split_data
     
 
 
@@ -443,7 +453,7 @@ class NLP_Tasks:
 
         df = df.copy()
         df[column] = df[column].fillna('').astype(str)
-        df[column] = df[column].apply(lambda x: NLP_Tasks.chunk_with_overlap(x, max_length, overlap))
+        df[column] = df[column].apply(lambda x: self.chunk_with_overlap(x, max_length, overlap))
 
         # Explode the DataFrame to have one row per chunk
         df = df.explode(column, ignore_index=True)
@@ -586,3 +596,66 @@ class NLP_Tasks:
         merged_comments_df = grouped.apply(aggregate_group_data).reset_index()
 
         return merged_comments_df
+    
+
+
+    def merge_topics_to_comments(self, df, probs, min_prob = 0.02, insert_db=False):
+        all_topic_list =[]
+        all_prob_list = []
+
+        # Iterate through each document's topics and probabilities
+        # and filter out those below the minimum probability threshold
+        for i in range(len(df)):
+            high_prob_indices = np.where(probs[i] > min_prob)[0]
+            high_prob_topics = [i for i in high_prob_indices]
+            high_prob_probs = [probs[i][j] for j in high_prob_indices]
+            topic_list = []
+            prob_list = []
+            for topic, prob in zip(high_prob_topics, high_prob_probs):
+                topic_list.append(topic)
+                prob_list.append(prob)
+                if len(topic_list) - len(prob_list) != 0:
+                    print(f'Length mismatch at index {i}: {len(topic_list)} vs {len(prob_list)}')
+                
+            all_topic_list.append(topic_list)
+            all_prob_list.append(prob_list)
+
+        # add the topics and probabilities to the dataframe
+        df['topics'] = all_topic_list
+        df['probs'] = all_prob_list
+
+        # Group by original_comment_id
+        grouped = df.groupby('original_comment_id')
+
+        for original_comment_id, group in grouped:
+            # Flatten topics and probs, maintaining their pairings
+            flat_pairs = [
+                (int(topic), prob)
+                for topics_sublist, probs_sublist in zip(group['topics'], group['probs'])
+                for topic, prob in zip(topics_sublist, probs_sublist)
+            ]
+
+            # Use a dictionary to deduplicate by topic while preserving the first associated prob
+            seen = {}
+            for topic, prob in flat_pairs:
+                if topic not in seen:
+                    seen[topic] = prob
+
+            # Extract deduplicated topics and corresponding probs
+            grouped_topics = list(seen.keys())
+            grouped_probs = list(seen.values())
+
+            if len(grouped_topics) != len(grouped_probs):
+                print(f"Length mismatch for original_comment_id {original_comment_id}: {len(grouped_topics)} vs {len(grouped_probs)}")
+
+            # Optional: get a representative comment_id (e.g., first one)
+            comment_id = group['comment_id'].iloc[0]
+
+            if insert_db==True:      
+                # This chunk inserts the topics and probability into the remote database 
+                self.tp.insert_topic(comment_id=comment_id,
+                    topic_number=grouped_topics,
+                    probability=grouped_probs
+                )
+
+        return df 

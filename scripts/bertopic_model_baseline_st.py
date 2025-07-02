@@ -1,3 +1,7 @@
+# This is the same script as `bertopic_model.py` but uses the baseline ST model "all-MiniLM-L6-v2" for embedding rather than the fine-tuned one "Bea-Taylor/objection_fine_tuned_4"
+# NOTE this script saves the topics and their embeddings BUT does NOT save the topics back to the database and does NOT save the entire model to disk. 
+
+
 # Import necessary packages 
 import pandas as pd
 import numpy as np
@@ -21,12 +25,12 @@ from nlp_tasks import NLP_Tasks
 
 # Redirect stdout to a file
 orig_stdout = sys.stdout
-stdout_filepath = 'topic_stdout/bertopic_model_stdout.txt'
+stdout_filepath = 'topic_stdout/bertopic_model_baseline_st_stdout.txt'
 f = open(stdout_filepath, 'w')
 sys.stdout = f
 
 # define filepath for model outputs 
-output_filepath = '/root/comment_crunch/outputs/topic_model/full_bertopic/'
+output_filepath = '/root/comment_crunch/outputs/topic_model/full_bertopic_baseline_st/'
 
 # instantiate the Comments and Topics classes
 cs = Comments(env="dev")
@@ -36,7 +40,7 @@ nlp_tasks = NLP_Tasks()
 
 # Load the fine-tuned SentenceTransformer model
 # This model is fine-tuned for objection classification
-sentence_model = SentenceTransformer("Bea-Taylor/objection_fine_tuned_4")
+sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
 tokenizer = sentence_model.tokenizer
 
 
@@ -136,12 +140,12 @@ object_topic_embeddings_df.to_csv(object_topic_embeddings_path, index=False)
 
 print(f'Object topic embeddings saved to: {object_topic_embeddings_path}')
 
-# merge topics back to comments 
-# and save to the remote db 
-nlp_tasks.merge_topics_to_comments(df_objects_split, object_probs, min_prob=min_topic_prob, insert_db=True)
+# # merge topics back to comments 
+# # and save to the remote db 
+# nlp_tasks.merge_topics_to_comments(df_objects_split, object_probs, min_prob=min_topic_prob, insert_db=True)
 
-# save the entire topic model 
-topic_model.save(output_filepath+'full_model/object_model', serialization="safetensors", save_ctfidf=True)
+# # save the entire topic model 
+# topic_model.save(output_filepath+'full_model/object_model', serialization="safetensors", save_ctfidf=True)
 
 
 ### NEUTRAL TOPICS ###
@@ -175,12 +179,12 @@ neutral_topic_embeddings_df.to_csv(neutral_topic_embeddings_path, index=False)
 
 print(f'Neutral topic embeddings saved to: {neutral_topic_embeddings_path}')
 
-# merge topics back to comments
-# and save to the remote db
-nlp_tasks.merge_topics_to_comments(df_neutral_split, neutral_probs, min_prob=min_topic_prob, insert_db=True)
+# # merge topics back to comments
+# # and save to the remote db
+# nlp_tasks.merge_topics_to_comments(df_neutral_split, neutral_probs, min_prob=min_topic_prob, insert_db=True)
 
-# save the entire topic model 
-topic_model.save(output_filepath+'full_model/neutral_model', serialization="safetensors", save_ctfidf=True)
+# # save the entire topic model 
+# topic_model.save(output_filepath+'full_model/neutral_model', serialization="safetensors", save_ctfidf=True)
 
 
 ### SUPPORTS TOPICS ###
@@ -214,12 +218,12 @@ supports_topic_embeddings_df.to_csv(supports_topic_embeddings_path, index=False)
 
 print(f'Supports topic embeddings saved to: {supports_topic_embeddings_path}')
 
-# merge topics back to comments
-# and save to the remote db
-nlp_tasks.merge_topics_to_comments(df_supports_split, supports_probs, min_prob=min_topic_prob, insert_db=True)
+# # merge topics back to comments
+# # and save to the remote db
+# nlp_tasks.merge_topics_to_comments(df_supports_split, supports_probs, min_prob=min_topic_prob, insert_db=True)
 
-# save the entire topic model
-topic_model.save(output_filepath+'full_model/supports_model', serialization="safetensors", save_ctfidf=True)
+# # save the entire topic model
+# topic_model.save(output_filepath+'full_model/supports_model', serialization="safetensors", save_ctfidf=True)
 
 
 ### FINISHED! ###

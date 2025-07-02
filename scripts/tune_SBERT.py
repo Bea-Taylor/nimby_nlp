@@ -1,3 +1,5 @@
+# NOTE: this is not the script used to train the model - I actually used '1_0_6_SBERT_fine_tune.ipynb' notebook to train the model
+
 import pickle
 import logging
 from sentence_transformers import SentenceTransformer, losses
