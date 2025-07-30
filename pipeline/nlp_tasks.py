@@ -7,6 +7,7 @@ import torch
 from sentence_transformers import SentenceTransformer
 from datasets import Dataset
 import re
+import regex
 import string 
 
 from database.topics import Topics
@@ -659,3 +660,46 @@ class NLP_Tasks:
                 )
 
         return df 
+    
+
+
+    def split_period_or_length(self, comment, max_length=100):
+        sentences = regex.split(r'(?<=[.!?]) +', comment)
+        split_sentences = []
+        for sentence in sentences:
+            if len(sentence) > max_length:
+                # Split long sentences into smaller chunks
+                for i in range(0, len(sentence), max_length):
+                    split_sentences.append(sentence[i:i + max_length])
+            else:
+                split_sentences.append(sentence)
+        return split_sentences
+    
+
+
+    def sentiment_score(self, comment, stance, sentiment_model):
+    
+        # Split the comment into sentences
+        sentences = self.split_period_or_length(comment, max_length=100)
+        n = len(sentences)
+
+        # Analyse sentiment for each sentence
+        sentiment_results = sentiment_model(sentences)
+
+        # Calculate score by adding 'POS' scores and subtracting 'NEG' scores
+        score = 0
+        for result in sentiment_results:
+            if result['label'] == 'POS':
+                score += result['score']
+            elif result['label'] == 'NEG':
+                score -= result['score']
+
+        score = float(score / n)
+
+        # Adjust score based on stance
+        if stance == 'Objects' and score > 0:
+            score = 0
+        elif stance == 'Supports' and score < 0:
+            score = 0
+
+        return score
