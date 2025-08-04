@@ -14,11 +14,14 @@ nlp = NLP_Tasks()
 
 df = cs.read_all()
 
+# to ensure that the sentiment scoring is only done on comments that do not already have a sentiment score
+df = df[df['sentiment_score'].isna()].reset_index(drop=True)
+
 sentiment_model = pipeline(model="finiteautomata/bertweet-base-sentiment-analysis")
 
 for i in range(len(df)):
     id = df['comment_id'][i]
-    comment = df['cleaned_comment_text'][i]
+    comment = str(df['cleaned_comment_text'][i])
     stance = df['stance'][i]
     
     score = nlp.sentiment_score(comment, stance, sentiment_model)
