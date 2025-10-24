@@ -1,6 +1,6 @@
-# ***comment crunch***
+# ***Neighbour NLP***
 
-The code inside this repo provides the pipeline for processing comments from planning applications, and generating reports and summary statistics.
+The code inside this repo generates the analysis for the draft paper I'm currently working on. 
 
 ## So what's it all about? 
 
@@ -10,30 +10,12 @@ More controversial projects might result in 100s of representations - which can 
 
 This work uses data collected [*comment_mill*](https://github.com/AI4CI-smart-cities/comment_mill). This repo provides the code for processing this data, starting with developing a fine-tuned domain specific transformer model. This is then used for downstream tasks including topic modelling and sentiment analysis. 
 
-## How do I implement it? 
+## The data 
+You can see the code I wrote for web-scraping the data in [comment_summariser](). 
 
-Coming soon!
+## ML models 
+The code to generate the ML models can also be found in [comment_crunch](). 
 
 ### Sharing the work
 
 This tool was developed by AI4CI Smart Cities project in the [Centre for Advanced Spatial Analysis (CASA)](https://www.ucl.ac.uk/bartlett/casa).
-
-
-#### Docker
-
-If you wish to install and run via a Jupyter notebook in Docker:
-
-Build the image:
-
-```
-docker build -t "comment_crunch" .
-```
-
-Run the image:
-```
-docker run -p 8888:8888 comment_crunch
-```
-
-Then navigate in your browser to:
-
-[127.0.0.1:8888](127.0.0.1:8888)
