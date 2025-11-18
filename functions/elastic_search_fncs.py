@@ -155,7 +155,10 @@ class ElasticSearchFncs:
             "street_name",
             "uprn",
             "polygon",
-            "wgs84_polygon"
+            "wgs84_polygon",
+            "wgs84_polygon.coordinates",
+            "polygon.coordinates",
+            "postcode"
         ]
         }
 

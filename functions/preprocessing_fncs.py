@@ -2,6 +2,19 @@ import pandas as pd
 import numpy as np
 import re
 
+import time
+import random
+import requests
+import urllib3
+
+import geopandas as gpd
+from geopy.geocoders import Nominatim
+
+from shapely.geometry import Polygon, Point
+
+# Create a Nominatim geocoder
+geolocator = Nominatim(user_agent="ai4ci-sc4")
+
 def format_borough(df, borough_col_name='borough'):
     """Standardizes borough names by removing redundant text and normalizing naming.
     
@@ -271,3 +284,104 @@ def add_housing_type(df):
             df.at[i, 'housing_type'] = 'Other'
     
     return df
+
+
+
+def get_coords(address, geolocator):
+    """Get coordinates for an address by incrementally building it from the end."""
+
+    try:
+        coords = geolocator.geocode(address, timeout=10)
+        if coords is None:
+            return None, None
+        else:
+            # print(f"Success: '{address}' → Lat: {coords.latitude}, Lon: {coords.longitude}")
+            return coords.latitude, coords.longitude
+
+    except (urllib3.exceptions.ConnectTimeoutError,
+            urllib3.exceptions.MaxRetryError,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout):
+        time.sleep(random.uniform(5.0, 10.0))  # Longer backoff
+        return None, None
+    except Exception as e:
+        return None, None
+
+
+
+# Define helper functions
+def build_polygon(coords):
+    if isinstance(coords, list) and coords and isinstance(coords[0], list):
+        try:
+            return Polygon(coords[0])
+        except Exception:
+            return None
+    return None
+
+
+
+def get_point_from_postcode(postcode):
+    try:
+        lat, lon = get_coords(postcode, geolocator)
+        return Point(lon, lat)  # Note: Point(longitude, latitude)
+    except Exception:
+        return None
+    
+
+
+def format_polygon(df):
+    # 1. Extract geometries from EPSG:4326 polygons
+    df_wgs84 = df[df['wgs84_polygon.coordinates'].notna()].copy()
+    df_wgs84['geometry'] = df_wgs84['wgs84_polygon.coordinates'].apply(build_polygon)
+    gdf_wgs84 = gpd.GeoDataFrame(df_wgs84, geometry='geometry', crs='EPSG:4326')
+
+    # 2. Extract geometries from EPSG:27700 polygons
+    df_27700 = df[
+        df['wgs84_polygon.coordinates'].isna() & df['polygon.coordinates'].notna()
+    ].copy()
+    df_27700['geometry'] = df_27700['polygon.coordinates'].apply(build_polygon)
+    gdf_27700 = gpd.GeoDataFrame(df_27700, geometry='geometry', crs='EPSG:27700')
+
+    # 3. Geocode remaining rows using postcode
+    df_missing = df[
+        df['wgs84_polygon.coordinates'].isna() & df['polygon.coordinates'].isna()
+    ].copy()
+    df_missing['geometry'] = df_missing['postcode'].apply(get_point_from_postcode)
+    gdf_missing = gpd.GeoDataFrame(df_missing, geometry='geometry', crs='EPSG:4326')
+
+    # 4. Convert everything to 'EPSG:4326'
+    gdf_27700 = gdf_27700.to_crs('EPSG:4326')
+
+    # 5. Combine all valid geodataframes
+    gdf = pd.concat([gdf_wgs84, gdf_27700, gdf_missing], ignore_index=True)
+    gdf = gdf[gdf.geometry.notna()]
+
+    # Add other geo information columns  
+
+    # add centroids 
+    gdf['centroid'] = gdf['geometry'].centroid
+
+    # add area in square meters
+
+    # first have to reproject to EPSG:27700 (meters)
+    gdf_meters = gdf.to_crs(epsg=27700)
+    # Calculate area in square meters
+    gdf_meters['polygon_area_m2'] = gdf_meters.geometry.area
+
+    # Handle zero area polygons by setting them to NaN
+    gdf_meters.loc[gdf_meters['polygon_area_m2'] == 0, 'polygon_area_m2'] = np.nan
+
+    # Apply classification
+    def site_type(row):
+        if 0 < row['polygon_area_m2'] < 2500:
+            return '< 0.25 hectares'
+        elif row['polygon_area_m2'] >= 2500:
+            return '>= 0.25 hectares'
+        else:
+            return 'Unknown'
+
+    gdf_meters['site_type'] = gdf_meters.apply(site_type, axis=1)
+    gdf['site_type'] = gdf_meters['site_type']
+    gdf['polygon_area_m2'] = gdf_meters['polygon_area_m2']
+
+    return gdf 
