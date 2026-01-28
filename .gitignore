@@ -1,5 +1,5 @@
 ### Data ###
-outputs/
+model_outputs/
 /outputs
 /data
 *.csv
