@@ -329,31 +329,38 @@ def get_point_from_postcode(postcode):
     
 
 
-def format_polygon(df):
+def format_polygon(df, wgs84_col='wgs84_polygon.coordinates', epsg27700_col='polygon.coordinates', postcode_col='postcode'):
     # 1. Extract geometries from EPSG:4326 polygons
-    df_wgs84 = df[df['wgs84_polygon.coordinates'].notna()].copy()
-    df_wgs84['geometry'] = df_wgs84['wgs84_polygon.coordinates'].apply(build_polygon)
+    df_wgs84 = df[df[wgs84_col].notna()].copy()
+    df_wgs84['geometry'] = df_wgs84[wgs84_col].apply(build_polygon)
     gdf_wgs84 = gpd.GeoDataFrame(df_wgs84, geometry='geometry', crs='EPSG:4326')
 
     # 2. Extract geometries from EPSG:27700 polygons
     df_27700 = df[
-        df['wgs84_polygon.coordinates'].isna() & df['polygon.coordinates'].notna()
+        df[wgs84_col].isna() & df[epsg27700_col].notna()
     ].copy()
-    df_27700['geometry'] = df_27700['polygon.coordinates'].apply(build_polygon)
+    df_27700['geometry'] = df_27700[epsg27700_col].apply(build_polygon)
     gdf_27700 = gpd.GeoDataFrame(df_27700, geometry='geometry', crs='EPSG:27700')
 
     # 3. Geocode remaining rows using postcode
-    df_missing = df[
-        df['wgs84_polygon.coordinates'].isna() & df['polygon.coordinates'].isna()
-    ].copy()
-    df_missing['geometry'] = df_missing['postcode'].apply(get_point_from_postcode)
-    gdf_missing = gpd.GeoDataFrame(df_missing, geometry='geometry', crs='EPSG:4326')
+    if postcode_col not in df.columns:
+        # skip geocoding if postcode column is not present, but raise a warning
+        gdf_missing = gpd.GeoDataFrame(columns=df.columns.tolist() + ['geometry'], geometry='geometry', crs='EPSG:4326')
+        # raise ValueError(f"Postcode column '{postcode_col}' not found in dataframe.")
+    
+    else:
+        df_missing = df[
+        df[wgs84_col].isna() & df[epsg27700_col].isna()
+         ].copy()
+        df_missing['geometry'] = df_missing['postcode'].apply(get_point_from_postcode)
+        gdf_missing = gpd.GeoDataFrame(df_missing, geometry='geometry', crs='EPSG:4326')
 
     # 4. Convert everything to 'EPSG:4326'
     gdf_27700 = gdf_27700.to_crs('EPSG:4326')
 
     # 5. Combine all valid geodataframes
-    gdf = pd.concat([gdf_wgs84, gdf_27700, gdf_missing], ignore_index=True)
+    # gdf = pd.concat([gdf_wgs84, gdf_27700, gdf_missing], ignore_index=True)
+    gdf = pd.concat([gdf_wgs84, gdf_27700], ignore_index=True)
     gdf = gdf[gdf.geometry.notna()]
 
     # Add other geo information columns  
