@@ -136,9 +136,9 @@ COLOUR_GREY      = "#9f9f9f"
 
 # Palette for commenter stance
 STANCE_PALETTE = {
-    "Supports": "#426acf",
+    "Supports": "#b8cd73",
     "Objects":  "#cf4242",
-    "Neutral":  "#b8cd73",
+    "Neutral":  "#426acf",
 }
 
 # Per-topic colours (rotated over the list when there are more topics than colours)
