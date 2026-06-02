@@ -1,21 +1,48 @@
-# ***Neighbour NLP***
+# Neighbour NLP
 
-The code inside this repo generates the analysis for the paper 'Hate thy neighbour'. 
+Analysis code for the paper *'Hate thy neighbour'*, examining public representations submitted to UK planning authorities through natural language processing and spatial analysis.
 
-## So what's it all about? 
+## Background
 
-In the UK, following the submission of a planning application to the local council or local planning authority (LPA), there is a phase whereby members of the local community are allowed to comment on the application. In the planning community these comments are called representations. Typically councils ask community repsondents to classify whether their feedback 'objects', 'supports' or takes a 'neutral' stance toward the planning application. 
+When a planning application is submitted to a local planning authority (LPA) in England, members of the public are invited to submit representations — written comments that object to, support, or take a neutral stance on the proposal. For contentious applications this can generate hundreds of responses, creating a significant processing burden for planning officers who must read, categorise, and summarise all material received.
 
-More controversial projects might result in 100s of representations - which can be time consuming for councils to process, since planning opfficers have a responsibility to read-through, categorise and sumamrise any comments received. As part of this process they also classify whether obejctions are material or non-material. 
+This repository provides the analysis pipeline for a corpus of planning representations collected across London boroughs. It applies topic modelling, sentiment analysis, spatial disaggregation, and demographic profiling to characterise patterns of public objection at scale.
 
-This work uses data collected [*comment_mill*](https://github.com/AI4CI-smart-cities/comment_mill). This repo provides the code for analysing this data.
+## Repository Structure
 
-## The data 
-You can see the code I wrote for web-scraping the data in [comment_summariser](). 
+```
+notebooks/          # Analysis notebooks (run in order)
+  01_descriptive_analysis.ipynb
+  02_topic_analysis.ipynb
+  03_sentiment_analysis.ipynb
+  04_spatial_analysis.ipynb
+  05_demographic_analysis.ipynb
+  06_LAD_topic_maps.ipynb
+functions/          # Shared utilities and configuration
+data/               # Input data (see Data section below)
+results/            # Outputs: tables, figures, parquet files
+```
 
-## ML models 
-The code to generate the ML models can also be found in [comment_crunch](). This creates the NLP analysis - specifically the topic modelling and sentiment analysis. 
+## Data
 
-### Sharing the work
+Raw representations were collected using [comment_mill](https://github.com/AI4CI-smart-cities/comment_mill). Pre-processed data and NLP model outputs are hosted on Zenodo:
 
-This tool was developed by AI4CI Smart Cities project in the [Centre for Advanced Spatial Analysis (CASA)](https://www.ucl.ac.uk/bartlett/casa).
+> Dataset: https://zenodo.org/records/19567801
+
+The analysis also draws on 2021 Census data (age, occupation, tenure at LSOA level) and ONS/DLUHC geospatial boundaries for London Local Authority Districts and LPAs.
+
+## NLP Models
+
+Topic modelling and sentiment classification models were generated using [comment_crunch](https://github.com/AI4CI-smart-cities/comment_crunch). The outputs — topic assignments and sentiment scores per comment — are provided as pre-computed CSVs in `data/` and can be reproduced independently via that repository.
+
+Core dependencies include `BERTopic`, `sentence-transformers`, `transformers`, and `geopandas`. See `environment.yml` for the full specification.
+
+## Publications
+
+Conference paper: https://zenodo.org/records/19567801
+
+Journal paper: *in preparation*
+
+## Attribution
+
+Developed by the [AI4CI Smart Cities](https://github.com/AI4CI-smart-cities) project at the [Centre for Advanced Spatial Analysis (CASA)](https://www.ucl.ac.uk/bartlett/casa), UCL.
