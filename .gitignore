@@ -23,3 +23,7 @@ docker-compose.prod.yml
 *.dockerignore
 docker
 /docker
+
+## certificates
+.crt
+.key
