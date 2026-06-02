@@ -2,146 +2,56 @@
 config.py
 ---------
 Central configuration for the planning comments analysis project.
-Edit this file to change data paths, topic groupings, or visual styles.
+Edit this file to change data paths or visual styles.
 """
 
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Paths  (all relative to the repo root so the project is portable)
+# Paths
 # ---------------------------------------------------------------------------
-ROOT = Path(__file__).resolve().parents[1]   # repo root
+ROOT        = Path(__file__).resolve().parents[1]   # repo root
+DATA_DIR    = ROOT / "data"
+RESULTS_DIR = ROOT / "results"
+FIGURES_DIR = RESULTS_DIR / "figures"
 
-DATA_DIR          = ROOT / "data"
-RESULTS_DIR       = ROOT / "results"
-FIGURES_DIR       = RESULTS_DIR / "figures"
-MODEL_OUTPUTS_DIR = ROOT / "model_outputs"
+# Input datasets
+COMMENTS_CSV        = DATA_DIR / "comments.csv"
+COMMENTS_TOPICS_CSV = DATA_DIR / "comments_with_topics.csv"
+TOPIC_NAMES_CSV     = DATA_DIR / "topic_names.csv"
 
-# Raw data files
-APPLICATION_CSV   = DATA_DIR / "PLD_application_ids" / "all_since21_cleaned.csv"
+# Pre-computed planning datasets (no CSV equivalent — kept in results/)
+PLD_FILE          = RESULTS_DIR / "pld.parquet"
+APPLICATIONS_FILE = RESULTS_DIR / "applications.parquet"
 
 # Geospatial boundaries
-LONDON_LAD_FILE   = DATA_DIR / "london_geos" / "Local_Authority_Districts_May_2024_London.geojson"
-LONDON_LPA_FILE   = DATA_DIR / "london_geos" / "local-planning-authority-london.geojson"
-LSOA_BOUNDARIES   = DATA_DIR / "london_geos" / "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BSC_V4_-4299016806856585929.geojson"
+LONDON_LAD_FILE = DATA_DIR / "london_geos" / "Local_Authority_Districts_May_2024_London.geojson"
+LONDON_LPA_FILE = DATA_DIR / "london_geos" / "local-planning-authority-london.geojson"
+LSOA_BOUNDARIES = DATA_DIR / "london_geos" / "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BSC_V4_-4299016806856585929.geojson"
 
 # Census data
-CENSUS_AGE_FILE       = DATA_DIR / "2021_census" / "Five year age bands.xlsx"
-CENSUS_OCCUPATION_FILE= DATA_DIR / "2021_census" / "occupation.xlsx"
-CENSUS_TENURE_FILE    = DATA_DIR / "2021_census" / "tenure - households.xlsx"
-
-# Topic model outputs
-FINETUNED_MODEL_DIR   = MODEL_OUTPUTS_DIR / "finetuned_objection"
-BASELINE_MODEL_DIR    = MODEL_OUTPUTS_DIR / "not_tuned_objection"
-BERTOPIC_MODEL_PATH   = MODEL_OUTPUTS_DIR / "topic_model" / "bertopic_less_topics" / "full_model" / "object_model"
-
-# ---------------------------------------------------------------------------
-# Elasticsearch / database
-# ---------------------------------------------------------------------------
-ES_QUERY_PARAMS = dict(
-    min_res_units = 1,
-    since_year    = "01/01/2021",
-    to_year       = "01/05/2025",
-)
-
-# The date used to isolate a single topic-modelling run
-TOPIC_RUN_DATE = "2026-01-24"
-
-# ---------------------------------------------------------------------------
-# Topic post-processing
-# ---------------------------------------------------------------------------
-
-# Topics to discard entirely (noise / artefacts from BERTopic)
-BAD_TOPICS = [-1, 0, 13, 24, 34, 39, 40, 43, 45, 49, 66, 69, 81, 88, 89, 90, 95]
-
-# Topics that are semantically equivalent – the first id in each list is the
-# canonical representative; all others are merged into it.
-SAME_TOPICS = {"impact on parking":[1,15,30,35,42,47,48,63],
-               "loss of gardens":[2,41],
-               "out of character":[3,56,77,91],
-               "construction access":[4],
-               "too tall":[5,23],
-               "impact on heritage and conservation":[6,31,46,84],
-               "impact on amenities":[7, 86, 27],
-               "loss of privacy":[8],
-               "loss of light":[9],
-               "wrong housing type":[10,68],
-               "overdevelopment":[11,29,37,51,71],
-               "noise pollution":[12,36,38,61, 94],
-               "impact on schools and doctors":[14],
-               "impact on road safety":[16],
-               "bins and recycling":[17,22],
-               "air pollution":[18],
-               "biodiversity loss":[19],
-               "drainage and flooding":[20],
-               "increase in traffic":[21,62],
-               "lack of affordable housing":[25],
-               "lack of consultation":[26,72],
-               "loss of view":[28],
-               "impact on climate change":[32],
-               "impact on property value":[33],
-               "loss of public parks":[44],
-               "air pollution and asbestos":[50,83],
-               "maintenance issues":[52],
-               "impact on disabled access":[53],
-               "impact on disabled parking":[54],
-               "light pollution":[55],
-               "impact on building access":[57],
-               "eyesore":[58],
-               "building security issues":[59],
-               "issue with land covenants":[60],
-               "impact on water supply":[64],
-               "increased crime":[65],
-               "innacurate application:":[67, 74],
-               "poor quality homes":[70],
-               "environmental damage":[73,93],
-               "impact on vulnerable residents":[75],
-               "soil contamination":[76],
-               "too much student housing":[78],
-               "impact on mental health":[79],
-               "impact on university":[80],
-               "not complaint with building codes":[82],
-               "issues with retaining wall":[85],
-               "sewage smell":[87],
-               "general nuisance":[92],
-               "impact on rail embankment":[96],
-               "increased emissions":[97],
-               "impact on public access":[98]}
-
-# Derived lookup: every topic id → its canonical id
-TOPIC_MAP: dict[int, int] = {
-    t: topics[0]
-    for topics in SAME_TOPICS.values()
-    for t in topics
-}
-
-# Derived lookup: canonical id → human-readable group name
-TOPIC_GROUP_MAP: dict[int, str] = {
-    topics[0]: group_name
-    for group_name, topics in SAME_TOPICS.items()
-}
+CENSUS_AGE_FILE        = DATA_DIR / "2021_census" / "Five year age bands.xlsx"
+CENSUS_OCCUPATION_FILE = DATA_DIR / "2021_census" / "occupation.xlsx"
+CENSUS_TENURE_FILE     = DATA_DIR / "2021_census" / "tenure - households.xlsx"
 
 # ---------------------------------------------------------------------------
 # Visual style
 # ---------------------------------------------------------------------------
 
-# Primary brand colours
-COLOUR_PRIMARY   = "#894e9e"   # purple
-COLOUR_SECONDARY = "#abc766"   # green
-COLOUR_ACCENT    = "#e16fca"   # pink
+COLOUR_PRIMARY   = "#894e9e"
+COLOUR_SECONDARY = "#abc766"
+COLOUR_ACCENT    = "#e16fca"
 COLOUR_YELLOW    = "#f9dd73"
 COLOUR_TEAL      = "#2e6260"
 COLOUR_BROWN     = "#a9746e"
 COLOUR_GREY      = "#9f9f9f"
 
-# Palette for commenter stance
 STANCE_PALETTE = {
     "Supports": "#b8cd73",
     "Objects":  "#cf4242",
     "Neutral":  "#426acf",
 }
 
-# Per-topic colours (rotated over the list when there are more topics than colours)
 TOPIC_COLOURS = [
     "#336589", "#aad874", "#fba337", "#b63838", "#a373d0",
     "#865349", "#F2F527", "#494A2A", "#df51b4", "#7d6565",
@@ -151,14 +61,13 @@ TOPIC_COLOURS = [
     "#a8dadf", "#7A6CC8", "#A7A70A", "#A1D6A7", "#27c968",
 ]
 
-# Housing type colours
 HOUSING_TYPE_COLOURS = {
-    "Market housing":          "#894e9e",
-    "Mixed affordable housing":"#abc766",
-    "Mixed social housing":    "#e16fca",
-    "Social housing":          "#f9dd73",
-    "Self-build housing":      "#2e6260",
-    "Other":                   "#a9746e",
+    "Market housing":           "#894e9e",
+    "Mixed affordable housing": "#abc766",
+    "Mixed social housing":     "#e16fca",
+    "Social housing":           "#f9dd73",
+    "Self-build housing":       "#2e6260",
+    "Other":                    "#a9746e",
 }
 
 HOUSING_ORDER = [
@@ -170,7 +79,6 @@ HOUSING_ORDER = [
     "Other",
 ]
 
-# Inner-London boroughs used for inner/outer splits
 INNER_LONDON_BOROUGHS = [
     "Camden", "Greenwich", "Hackney", "Hammersmith and Fulham",
     "Islington", "Kensington and Chelsea", "Lambeth", "Lewisham",
